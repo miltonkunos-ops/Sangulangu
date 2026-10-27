@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Usavi Ledger</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1f6b45">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{--bg:#f2f5f0;--ink:#16231b;--mute:#5d6b61;--card:#fff;--line:#d8dfd6;--g:#1f6b45;--r:#b3321f;--a:#b7791f;--on:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1712;--ink:#e8efe9;--mute:#93a398;--card:#17221b;--line:#283629;--g:#5cc48a;--r:#ef7a66;--a:#e2b14f;--on:#0f1712;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1712;--ink:#e8efe9;--mute:#93a398;--card:#17221b;--line:#283629;--g:#5cc48a;--r:#ef7a66;--a:#e2b14f;--on:#0f1712;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 "Archivo",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-bottom:84px}
+main{max-width:640px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:0;letter-spacing:-.01em}
+h2{font-size:17px;margin:22px 0 8px}
+.sub{color:var(--mute);font-size:14px;margin:2px 0 14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px}
+.stat small{display:block;color:var(--mute);font-size:12px}
+.stat b{font-size:18px}
+.in{color:var(--g)}.out{color:var(--r)}.warn{color:var(--a)}
+label{display:block;font-size:13px;color:var(--mute);margin:10px 0 4px}
+input,select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;min-height:44px}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--g);outline-offset:2px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.seg button{min-height:44px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;font:inherit;font-weight:600}
+.seg button.on.s{background:var(--g);color:var(--on);border-color:var(--g)}
+.seg button.on.e{background:var(--r);color:var(--on);border-color:var(--r)}
+.btn{width:100%;min-height:46px;margin-top:14px;border:0;border-radius:8px;background:var(--ink);color:var(--bg);font:inherit;font-weight:700}
+.ghost{background:none;border:1px solid var(--line);color:var(--ink);margin-top:8px}
+.x{border:0;background:none;color:var(--mute);font-size:20px;min-width:44px;min-height:44px}
+.item{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.item .t{flex:1;min-width:0}
+.item .t b{display:block;overflow-wrap:anywhere}
+.item .t small{color:var(--mute)}
+.amt{font-weight:700;white-space:nowrap}
+.empty{color:var(--mute);padding:8px 0}
+.adj{display:flex;gap:6px}
+.adj button{min-width:44px;min-height:44px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;font-size:18px}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px))}
+nav button{min-height:48px;border:0;background:none;color:var(--mute);font:inherit;font-weight:600;border-radius:8px}
+nav button.on{color:var(--ink);background:var(--bg)}
+.tag{font-size:12px;border:1px solid currentColor;border-radius:99px;padding:1px 8px;margin-left:6px}
+.hide{display:none}
+</style>
+</head>
+<body>
+<main>
+  <h1>Usavi Express</h1>
+  <p class="sub">Income, expenses and stock in one place. Saved on this device.</p>
+  <section id="v-home"></section>
+  <section id="v-rec" class="hide"></section>
+  <section id="v-stk" class="hide"></section>
+</main>
+<nav>
+  <button data-v="home" class="on">Summary</button>
+  <button data-v="rec">Record</button>
+  <button data-v="stk">Stock</button>
+</nav>
+<script>
+(function(){
+var KEY='usavi-ledger-v1';
+var S={entries:[],stock:[]};
+try{var raw=localStorage.getItem(KEY);if(raw){var p=JSON.parse(raw);if(p&&p.entries&&p.stock)S=p;}}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function money(n){return '$'+(Math.round(n*100)/100).toFixed(2);}
+function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+var view='home',kind='income',msg='';
+
+function sum(list,type){return list.filter(function(e){return e.type===type;}).reduce(function(a,e){return a+e.amount;},0);}
+function stat(label,list){var i=sum(list,'income'),o=sum(list,'expense'),n=i-o;
+  return '<div class="card"><div class="row"><b>'+label+'</b><b class="'+(n>=0?'in':'out')+'">'+(n>=0?'Profit ':'Loss ')+money(Math.abs(n))+'</b></div>'+
+  '<div class="grid" style="margin-top:10px"><div class="stat"><small>Sales</small><b class="in">'+money(i)+'</b></div><div class="stat"><small>Expenses</small><b class="out">'+money(o)+'</b></div><div class="stat"><small>Entries</small><b>'+list.length+'</b></div></div></div>';}
+
+function home(){
+  var t=today(),m=t.slice(0,7);
+  var td=S.entries.filter(function(e){return e.date===t;});
+  var mo=S.entries.filter(function(e){return e.date.slice(0,7)===m;});
+  var tops={};mo.filter(function(e){return e.type==='income';}).forEach(function(e){tops[e.item]=(tops[e.item]||0)+e.amount;});
+  var tl=Object.keys(tops).sort(function(a,b){return tops[b]-tops[a];}).slice(0,5);
+  var low=S.stock.filter(function(s){return s.qty<=s.low;});
+  var h=stat('Today',td)+stat('This month',mo);
+  h+='<div class="card"><b>Best sellers this month</b>';
+  h+=tl.length?tl.map(function(k){return '<div class="item"><div class="t"><b>'+esc(k)+'</b></div><span class="amt in">'+money(tops[k])+'</span></div>';}).join(''):'<div class="empty">No sales recorded this month.</div>';
+  h+='</div><div class="card"><b>Running low</b>';
+  h+=low.length?low.map(function(s){return '<div class="item"><div class="t"><b>'+esc(s.name)+'</b></div><span class="amt warn">'+s.qty+' '+esc(s.unit)+' left</span></div>';}).join(''):'<div class="empty">'+(S.stock.length?'All stock levels are fine.':'Add stock items on the Stock tab.')+'</div>';
+  h+='</div><button class="btn ghost" id="csv">Copy all entries as CSV</button>';
+  h+='<textarea id="csvbox" class="hide" style="width:100%;height:120px;margin-top:8px"></textarea>';
+  $('v-home').innerHTML=h;
+  $('csv').onclick=function(){
+    var rows=['date,type,item,amount,stock_item,qty,note'].concat(S.entries.map(function(e){
+      var si=S.stock.filter(function(s){return s.id===e.sid;})[0];
+      return [e.date,e.type,e.item,e.amount,si?si.name:'',e.qty||'',e.note||''].map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}));
+    var txt=rows.join('\n'),box=$('csvbox');box.value=txt;box.classList.remove('hide');box.select();
+    try{navigator.clipboard.writeText(txt).then(function(){$('csv').textContent='Copied. Paste into Excel or Sheets.';},function(){});}catch(e){}
+  };
+}
+
+function rec(){
+  var opts='<option value="">None</option>'+S.stock.map(function(s){return '<option value="'+s.id+'">'+esc(s.name)+' ('+s.qty+' '+esc(s.unit)+')</option>';}).join('');
+  var h='<div class="card"><div class="seg"><button class="s'+(kind==='income'?' on':'')+'" data-k="income">Sale</button><button class="e'+(kind==='expense'?' on':'')+'" data-k="expense">Expense</button></div>'+
+  '<label for="f-item">What was it?</label><input id="f-item" placeholder="'+(kind==='income'?'e.g. Chicken feet, 2 portions':'e.g. Transport, ice, tomatoes')+'" autocomplete="off">'+
+  '<div class="two"><div><label for="f-amt">Amount ($)</label><input id="f-amt" type="number" inputmode="decimal" min="0" step="0.01"></div><div><label for="f-date">Date</label><input id="f-date" type="date" value="'+today()+'"></div></div>'+
+  '<div class="two"><div><label for="f-stock">Stock item (optional)</label><select id="f-stock">'+opts+'</select></div><div><label for="f-qty">'+(kind==='income'?'Quantity sold':'Quantity bought')+'</label><input id="f-qty" type="number" inputmode="decimal" min="0" step="any"></div></div>'+
+  '<label for="f-note">Note (optional)</label><input id="f-note" autocomplete="off">'+
+  '<button class="btn" id="f-save">Save '+(kind==='income'?'sale':'expense')+'</button><div id="f-msg" class="sub" role="status">'+esc(msg)+'</div></div>';
+  h+='<h2>Recent entries</h2><div class="card">';
+  var list=S.entries.slice().sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0;}).slice(0,40);
+  h+=list.length?list.map(function(e){return '<div class="item"><div class="t"><b>'+esc(e.item)+'</b><small>'+e.date+(e.note?' · '+esc(e.note):'')+'</small></div><span class="amt '+(e.type==='income'?'in':'out')+'">'+(e.type==='income'?'+':'−')+money(e.amount)+'</span><button class="x" data-del="'+e.id+'" aria-label="Delete entry">×</button></div>';}).join(''):'<div class="empty">Nothing recorded yet. Save your first sale or expense above.</div>';
+  h+='</div>';
+  $('v-rec').innerHTML=h;msg='';
+}
+
+function stk(){
+  var h='<div class="card"><b>Add a stock item</b><label for="s-name">Name</label><input id="s-name" placeholder="e.g. Chicken feet" autocomplete="off">'+
+  '<div class="two"><div><label for="s-unit">Unit</label><input id="s-unit" placeholder="kg, pcs, bunches"></div><div><label for="s-qty">Starting quantity</label><input id="s-qty" type="number" inputmode="decimal" min="0" step="any"></div></div>'+
+  '<label for="s-low">Warn me when it falls to</label><input id="s-low" type="number" inputmode="decimal" min="0" step="any" value="2">'+
+  '<button class="btn" id="s-add">Add item</button><div id="s-msg" class="sub" role="status"></div></div>';
+  h+='<h2>Current stock</h2><div class="card">';
+  h+=S.stock.length?S.stock.map(function(s){return '<div class="item"><div class="t"><b>'+esc(s.name)+(s.qty<=s.low?'<span class="tag warn">low</span>':'')+'</b><small>'+s.qty+' '+esc(s.unit)+'</small></div><div class="adj"><button data-adj="'+s.id+'" data-d="-1" aria-label="Remove one">−</button><button data-adj="'+s.id+'" data-d="1" aria-label="Add one">+</button></div><button class="x" data-sdel="'+s.id+'" aria-label="Delete stock item">×</button></div>';}).join(''):'<div class="empty">No stock items yet.</div>';
+  h+='</div>';
+  $('v-stk').innerHTML=h;
+}
+
+function stockFor(id){return S.stock.filter(function(s){return s.id===id;})[0];}
+function render(){
+  ['home','rec','stk'].forEach(function(v){$('v-'+v).classList.toggle('hide',v!==view);});
+  document.querySelectorAll('nav button').forEach(function(b){b.classList.toggle('on',b.dataset.v===view);});
+  if(view==='home')home();else if(view==='rec')rec();else stk();
+}
+
+document.addEventListener('click',function(ev){
+  var b=ev.target.closest('button');if(!b)return;
+  if(b.dataset.v){view=b.dataset.v;render();window.scrollTo(0,0);return;}
+  if(b.dataset.k){kind=b.dataset.k;rec();return;}
+  if(b.id==='f-save'){
+    var item=$('f-item').value.trim(),amt=parseFloat($('f-amt').value),date=$('f-date').value||today();
+    if(!item||!(amt>=0)||isNaN(amt)){$('f-msg').textContent='Enter what it was and an amount.';return;}
+    var sid=$('f-stock').value,qty=parseFloat($('f-qty').value)||0,si=sid?stockFor(sid):null;
+    if(si&&qty>0){si.qty=Math.round((si.qty+(kind==='income'?-qty:qty))*1000)/1000;}
+    S.entries.push({id:uid(),date:date,type:kind,item:item,amount:amt,sid:si?si.id:'',qty:si?qty:0,note:$('f-note').value.trim()});
+    save();msg=(kind==='income'?'Sale':'Expense')+' saved.';rec();return;
+  }
+  if(b.dataset.del){
+    var e=S.entries.filter(function(x){return x.id===b.dataset.del;})[0];
+    if(e&&e.sid&&e.qty){var s=stockFor(e.sid);if(s)s.qty=Math.round((s.qty+(e.type==='income'?e.qty:-e.qty))*1000)/1000;}
+    S.entries=S.entries.filter(function(x){return x.id!==b.dataset.del;});save();rec();return;
+  }
+  if(b.id==='s-add'){
+    var n=$('s-name').value.trim();if(!n){$('s-msg').textContent='Enter a name for the item.';return;}
+    S.stock.push({id:uid(),name:n,unit:$('s-unit').value.trim()||'pcs',qty:parseFloat($('s-qty').value)||0,low:parseFloat($('s-low').value)||0});
+    save();stk();return;
+  }
+  if(b.dataset.adj){var s2=stockFor(b.dataset.adj);if(s2){s2.qty=Math.max(0,s2.qty+parseInt(b.dataset.d,10));save();stk();}return;}
+  if(b.dataset.sdel){S.stock=S.stock.filter(function(x){return x.id!==b.dataset.sdel;});save();stk();return;}
+});
+render();
+if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}
+})();
+</script>
+</body>
+</html>
